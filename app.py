@@ -1,77 +1,51 @@
 import streamlit as st
-from moviepy.editor import *
-from pydub import AudioSegment
-from PIL import Image
+import librosa
 import numpy as np
-import random
+from PIL import Image, ImageEnhance
+import imageio
+import os
+import matplotlib.pyplot as plt
 
-def get_loudness_profile(audio_path, frame_rate=30):
-    sound = AudioSegment.from_file(audio_path)
-    samples = np.array(sound.get_array_of_samples())
-    samples = samples.astype(np.float32)
-    samples /= np.max(np.abs(samples))  # нормализация
-
-    chunk_size = int(len(samples) / (frame_rate * sound.duration_seconds))
-    loudness = []
-
-    for i in range(0, len(samples), chunk_size):
-        chunk = samples[i:i+chunk_size]
-        energy = np.sqrt(np.mean(chunk**2))
-        loudness.append(energy)
-
-    loudness = np.array(loudness)
-    return loudness / np.max(loudness)  # нормализация
-
-def make_audio_visualization(image_path, audio_path, output_path='output.mp4', duration=None):
-    img = Image.open(image_path)
-    audio = AudioFileClip(audio_path)
+def create_viz(audio_file, image_file):
+    # Загрузим аудио
+    y, sr = librosa.load(audio_file, sr=None)
+    # Получим амплитуду аудио
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+    # Создадим изображение
+    img = Image.open(image_file)
     
-    if duration is None:
-        duration = audio.duration
-
-    loudness = get_loudness_profile(audio_path, frame_rate=30)
-    total_frames = int(duration * 30)
-
-    if len(loudness) < total_frames:
-        loudness = np.pad(loudness, (0, total_frames - len(loudness)), mode='edge')
-    else:
-        loudness = loudness[:total_frames]
-
-    img = img.convert("RGB")
-    img_w, img_h = img.size
-
-    def make_frame(t):
-        frame_idx = int(t * 30)
-        intensity = loudness[frame_idx] * 10
-
-        offset_x = random.randint(-int(intensity), int(intensity))
-        offset_y = random.randint(-int(intensity), int(intensity))
-        new_img = Image.new("RGB", (img_w, img_h), (0, 0, 0))
-        new_img.paste(img, (offset_x, offset_y))
-
-        return np.array(new_img)
-
-    video = VideoClip(make_frame, duration=duration).set_audio(audio)
-    video.write_videofile(output_path, fps=30)
-
-st.title("Аудио-визуализация")
-st.write("Загрузите изображение и аудио, чтобы создать видео")
-
-image_file = st.file_uploader("Загрузите изображение", type=["jpg", "png"])
-audio_file = st.file_uploader("Загрузите аудио", type=["mp3", "wav"])
-
-if image_file and audio_file:
-    image_path = "uploaded_image.jpg"
-    audio_path = "uploaded_audio.mp3"
-
-    with open(image_path, "wb") as f:
-        f.write(image_file.read())
+    # Генерация кадров
+    frames = []
+    for i in range(50):
+        enhancer = ImageEnhance.Brightness(img)
+        factor = 1 + 0.2 * np.sin(i * 2 * np.pi / len(y))  # Меняем яркость
+        img_frame = enhancer.enhance(factor)
+        frames.append(np.array(img_frame))
     
-    with open(audio_path, "wb") as f:
-        f.write(audio_file.read())
+    # Сохранение GIF
+    gif_path = "/tmp/visualization.gif"
+    imageio.mimsave(gif_path, frames, duration=0.1)
+    return gif_path
+
+def main():
+    st.title("Audio Visualization with Image")
     
-    output_video_path = "output_video.mp4"
-    make_audio_visualization(image_path, audio_path, output_path=output_video_path)
-    
-    st.video(output_video_path)
-    st.success("Видео готово!")
+    # Загрузить аудио и изображение
+    audio_file = st.file_uploader("Upload an audio file", type=["mp3", "wav"])
+    image_file = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
+
+    if audio_file is not None and image_file is not None:
+        gif_path = create_viz(audio_file, image_file)
+        st.image(gif_path, caption="Generated Visualization", use_column_width=True)
+        
+        # Для скачивания GIF
+        with open(gif_path, "rb") as f:
+            st.download_button(
+                label="Download GIF",
+                data=f,
+                file_name="visualization.gif",
+                mime="image/gif"
+            )
+
+if __name__ == "__main__":
+    main()
