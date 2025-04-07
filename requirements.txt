@@ -1,5 +1,6 @@
 streamlit
-moviepy
-pydub
-Pillow
 numpy
+Pillow
+librosa
+imageio
+matplotlib
