@@ -27,26 +27,25 @@ def create_video(audio_file, image_file):
         out = cv2.VideoWriter(video_path, fourcc, 30.0, (1280, 720))
         
         for t in range(int(duration * 30)):  # 30 fps
-            frame = np.array(img)
-            frame = np.clip(frame, 0, 255)  # Еще раз нормализуем перед добавлением эффектов
-            
-            # Добавление динамики: движение изображения (тряска)
-            shake = int(np.sin(t / 10) * 20)  # Это создаст тряску
-            frame = np.roll(frame, shake, axis=1)
-            
-            # Изменение цветов: добавление эффекта
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-            frame[..., 0] = (frame[..., 0] + shake) % 180  # Обновление только оттенков (H)
-            frame[..., 1] = np.clip(frame[..., 1], 0, 255)  # Ограничение значений S
-            frame[..., 2] = np.clip(frame[..., 2], 0, 255)  # Ограничение значений V
-            frame = cv2.cvtColor(frame, cv2.COLOR_HSV2RGB)
-            
-            # Визуальные эффекты: добавление геометрических фигур, реагирующих на бит
-            if t % 30 == 0:  # Срабатывает на каждом 30 кадре
-                cv2.circle(frame, (640, 360), 100, (0, 255, 0), -1)  # Зеленый круг
-            
-            out.write(frame)
-        
+    frame = np.array(img)
+    
+    shake = int(np.sin(t / 10) * 20)
+    frame = np.roll(frame, shake, axis=1)
+
+    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+    frame[..., 0] = (frame[..., 0] + shake) % 180
+    frame[..., 1] = np.clip(frame[..., 1], 0, 255)
+    frame[..., 2] = np.clip(frame[..., 2], 0, 255)
+    frame = cv2.cvtColor(frame, cv2.COLOR_HSV2RGB)
+    
+    if t % 30 == 0:
+        cv2.circle(frame, (640, 360), 100, (0, 255, 0), -1)
+    
+    # 👉 Критичная строка
+    frame = np.clip(frame, 0, 255).astype(np.uint8)
+    
+    out.write(frame)
+    
         out.release()
         return video_path
     except Exception as e:
