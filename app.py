@@ -3,7 +3,6 @@ import numpy as np
 import cv2
 from PIL import Image
 from pydub import AudioSegment
-from pydub.playback import play
 from io import BytesIO
 import os
 
@@ -18,6 +17,10 @@ def create_video(audio_file, image_file):
         img = Image.open(image_file)
         img = img.resize((1280, 720))  # Размер изображения для видео
         
+        # Преобразуем изображение в массив numpy и нормализуем
+        frame = np.array(img)
+        frame = np.clip(frame, 0, 255)  # Нормализуем пиксели, чтобы они находились в пределах 0-255
+        
         # Настройка видео
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         video_path = "/tmp/visualization_video.mp4"
@@ -25,6 +28,7 @@ def create_video(audio_file, image_file):
         
         for t in range(int(duration * 30)):  # 30 fps
             frame = np.array(img)
+            frame = np.clip(frame, 0, 255)  # Еще раз нормализуем перед добавлением эффектов
             
             # Добавление динамики: движение изображения (тряска)
             shake = int(np.sin(t / 10) * 20)  # Это создаст тряску
