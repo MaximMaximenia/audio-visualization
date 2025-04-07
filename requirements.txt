@@ -1,6 +1,5 @@
+opencv-python
+pydub
 streamlit
 numpy
 Pillow
-librosa
-imageio
-matplotlib
