@@ -1,5 +1,5 @@
-opencv-python
-pydub
-streamlit
+streamlit==1.44.1
 numpy
-Pillow
+librosa==0.10.1
+opencv-python-headless
+pillow
