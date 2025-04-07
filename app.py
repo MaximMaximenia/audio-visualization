@@ -33,6 +33,8 @@ def create_video(audio_file, image_file):
             # Изменение цветов: добавление эффекта
             frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
             frame[..., 0] = (frame[..., 0] + shake) % 180  # Сдвиг оттенков по времени
+            frame[..., 1] = np.clip(frame[..., 1], 0, 255)  # Ограничение значений S
+            frame[..., 2] = np.clip(frame[..., 2], 0, 255)  # Ограничение значений V
             frame = cv2.cvtColor(frame, cv2.COLOR_HSV2RGB)
             
             # Визуальные эффекты: добавление геометрических фигур, реагирующих на бит
