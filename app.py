@@ -1,70 +1,61 @@
 import streamlit as st
 import numpy as np
+import librosa
+import tempfile
 import cv2
 from PIL import Image
-from pydub import AudioSegment
-from io import BytesIO
-import os
+from pathlib import Path
 
-def create_video(audio_file, image_file):
-    try:
-        st.write("Загружаем аудио...")
-        audio = AudioSegment.from_file(audio_file)
-        duration = len(audio) / 1000  # в секундах
-        st.write(f"Длительность аудио: {duration} секунд")
-        
-        st.write("Обрабатываем изображение...")
-        img = Image.open(image_file)
-        img = img.resize((1280, 720))  # Размер изображения для видео
-        
-        # Преобразуем изображение в массив numpy и нормализуем
-        frame = np.array(img)
-        frame = np.clip(frame, 0, 255)  # Нормализуем пиксели, чтобы они находились в пределах 0-255
-        
-        # Настройка видео
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        video_path = "/tmp/visualization_video.mp4"
-        out = cv2.VideoWriter(video_path, fourcc, 30.0, (1280, 720))
-        
-        for t in range(int(duration * 30)):  # 30 fps
-    frame = np.array(img)
-    
-    shake = int(np.sin(t / 10) * 20)
-    frame = np.roll(frame, shake, axis=1)
+st.set_page_config(page_title="Аудио Визуализация", layout="wide")
+st.title("🎧 Аудио Визуализация под бит")
 
-    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
-    frame[..., 0] = (frame[..., 0] + shake) % 180
-    frame[..., 1] = np.clip(frame[..., 1], 0, 255)
-    frame[..., 2] = np.clip(frame[..., 2], 0, 255)
-    frame = cv2.cvtColor(frame, cv2.COLOR_HSV2RGB)
-    
-    if t % 30 == 0:
-        cv2.circle(frame, (640, 360), 100, (0, 255, 0), -1)
-    
-    # 👉 Критичная строка
-    frame = np.clip(frame, 0, 255).astype(np.uint8)
-    
-    out.write(frame)
-    
-        out.release()
-        return video_path
-    except Exception as e:
-        st.write(f"Ошибка: {e}")
-        return None
+st.markdown("Загрузите изображение и аудио, чтобы сгенерировать видео с визуализацией под ритм.")
 
-def main():
-    st.title("Создание видео с визуализацией аудио 🎶")
-    audio_file = st.file_uploader("Выберите аудиофайл", type=["mp3", "wav"])
-    image_file = st.file_uploader("Выберите изображение", type=["jpg", "png", "jpeg"])
+image_file = st.file_uploader("📷 Загрузите изображение", type=["jpg", "jpeg", "png"])
+audio_file = st.file_uploader("🎵 Загрузите аудио", type=["mp3", "wav", "ogg"])
 
-    if audio_file and image_file:
-        with st.spinner('Генерация видео...'):
-            video_path = create_video(audio_file, image_file)
-        
-        if video_path:
+if image_file and audio_file:
+    with st.spinner("Загружаем аудио..."):
+        y, sr = librosa.load(audio_file, sr=None)
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        duration = librosa.get_duration(y=y, sr=sr)
+        st.success(f"Длительность аудио: {duration:.2f} секунд")
+        st.success(f"Обнаружен темп: {tempo:.2f} BPM")
+
+    with st.spinner("Обрабатываем изображение..."):
+        try:
+            img = Image.open(image_file).convert("RGB")
+            img = img.resize((1280, 720))
+            img_array = np.array(img)
+
+            temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+            video_path = temp_video.name
+
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            out = cv2.VideoWriter(video_path, fourcc, 30.0, (1280, 720))
+
+            for t in range(int(duration * 30)):  # 30 fps
+                frame = np.array(img_array)
+
+                shake = int(np.sin(t / 5.0) * 15)  # "под бит"
+                frame = np.roll(frame, shake, axis=1)
+
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV)
+                frame[..., 0] = (frame[..., 0] + shake) % 180
+                frame = cv2.cvtColor(frame, cv2.COLOR_HSV2RGB)
+
+                # ✅ Критично: избавляемся от -1 и приводим к uint8
+                frame = np.clip(frame, 0, 255).astype(np.uint8)
+
+                out.write(frame)
+
+            out.release()
+
+            st.success("✅ Видео сгенерировано!")
             st.video(video_path)
-            with open(video_path, "rb") as f:
-                st.download_button("Скачать видео", data=f, file_name="visualization.mp4", mime="video/mp4")
 
-if __name__ == "__main__":
-    main()
+            with open(video_path, "rb") as f:
+                st.download_button("📥 Скачать видео", f, file_name="visualized.mp4")
+
+        except Exception as e:
+            st.error(f"Ошибка: {str(e)}")
